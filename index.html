@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Callosum Snake</title>
+<title>Double Snake</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -87,7 +87,7 @@ kbd {
 
 <main class="wrap">
   <header>
-    <h1>CALLO<span>SUM</span><small>SNAKE</small></h1>
+    <h1>DOUBLE<span>SNAKE</span></h1>
     <div class="meta">
       <span>LEVEL <b id="lvl">--</b></span>
       <span>BERRIES <b id="berries">-</b></span>
@@ -101,7 +101,7 @@ kbd {
 
   <div class="ticker" aria-label="Encouragement"><div class="ticker-track" id="ticker"></div></div>
 
-  <div class="screen"><canvas id="c" width="960" height="540" tabindex="0" aria-label="Callosum Snake game screen"></canvas></div>
+  <div class="screen"><canvas id="c" width="960" height="540" tabindex="0" aria-label="Double Snake game screen"></canvas></div>
 
   <p class="hint" id="hint">Press <em>RETURN</em> (Enter) or click the screen to start. Keyboard required.</p>
 
@@ -1245,7 +1245,7 @@ function drawTitle() {
     const sv = swapped, st = state; swapped = false; state = 'title'; drawSnake(s, 1); swapped = sv; state = st;
   };
   fake(0, 1, 12, 0); fake(1, -1, 14, 3);
-  centerText('CALLOSUM', 150, 48, C.white, C.mauveDeep);
+  centerText('DOUBLE SNAKE', 150, 48, C.white, C.mauveDeep);
   centerText('TWO SNAKES  ·  ONE BRAIN', 200, 12, C.mauve);
   if ((tick >> 5) % 2 === 0) centerText('PRESS RETURN OR CLICK', 290, 16, C.text);
 }
