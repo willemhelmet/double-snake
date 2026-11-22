@@ -1,0 +1,1324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Callosum Snake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one arcade screen, Willem ticker above, two-hand control panel below.
+   Single committed dark look: Catppuccin Mocha, purple + black + white only. */
+:root {
+  --crust: #11111b;
+  --base: #1e1e2e;
+  --surface: #313244;
+  --overlay: #6c7086;
+  --text: #cdd6f4;
+  --white: #f5f3ff;
+  --lav: #b4befe;
+  --mauve: #cba6f7;
+  --deep: #2a1f45;
+  --display: "Press Start 2P", ui-monospace, monospace;
+  --body: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--crust); color: var(--text); }
+body { font-family: var(--body); font-size: 14px; }
+.wrap {
+  max-width: 1000px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-size: 20px; margin: 0; color: var(--white); letter-spacing: 2px; text-shadow: 3px 3px 0 var(--deep); }
+h1 span { color: var(--mauve); }
+h1 small { font-size: 10px; color: var(--overlay); text-shadow: none; margin-left: 8px; }
+.meta { font-family: var(--display); font-size: 9px; color: var(--overlay); display: flex; gap: 8px 18px; flex-wrap: wrap; }
+.meta b { color: var(--text); font-weight: 400; font-variant-numeric: tabular-nums; }
+.ticker { overflow: hidden; border-block: 2px solid var(--surface); background: var(--deep); white-space: nowrap; }
+.ticker-track { display: inline-flex; gap: 48px; padding-block: 8px; animation: scroll 38s linear infinite; font-family: var(--display); font-size: 10px; color: var(--mauve); }
+.ticker-track span::before { content: "\2605  "; color: var(--white); }
+@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.screen { position: relative; border: 4px solid var(--surface); background: var(--crust); box-shadow: 8px 8px 0 var(--deep); line-height: 0; }
+.screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(17,17,27,0) 0 2px, rgba(17,17,27,.18) 2px 3px);
+}
+canvas { width: 100%; height: auto; max-width: 100%; display: block; image-rendering: pixelated; outline: none; }
+.hint { font-size: 14px; color: var(--text); min-height: 1.4em; margin: 0; }
+.hint em { font-style: normal; color: var(--mauve); }
+.levels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.label { font-family: var(--display); font-size: 9px; color: var(--overlay); margin-right: 6px; }
+.levels button {
+  font-family: var(--display); font-size: 9px; background: var(--base); color: var(--text);
+  border: 2px solid var(--surface); padding: 7px 8px; cursor: pointer;
+}
+.levels button:hover, .levels button:focus-visible { border-color: var(--lav); outline: none; }
+.levels button[aria-current="true"] { background: var(--mauve); color: var(--crust); border-color: var(--mauve); }
+.hands { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .hands { grid-template-columns: 1fr; } }
+.hand { border: 2px solid var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: border-color .2s; min-width: 0; }
+.hand.flash { border-color: var(--white); }
+.hand-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hand h2 { font-family: var(--display); font-size: 10px; margin: 0; letter-spacing: 1px; color: var(--overlay); }
+.drives { font-family: var(--display); font-size: 10px; display: flex; align-items: center; gap: 8px; }
+.sw { width: 14px; height: 14px; display: inline-block; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.k { display: inline-flex; align-items: center; gap: 6px; color: var(--overlay); font-size: 12px; }
+kbd {
+  font-family: var(--display); font-size: 9px; color: var(--crust); background: var(--text);
+  padding: 5px 6px 4px; box-shadow: 0 3px 0 var(--overlay); min-width: 12px; text-align: center;
+}
+.tags { display: flex; gap: 6px; flex-wrap: wrap; min-height: 18px; }
+.tag { font-family: var(--display); font-size: 8px; padding: 4px 6px; background: var(--mauve); color: var(--crust); }
+.foot { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--overlay); font-size: 12px; align-items: center; }
+.foot .k kbd { font-size: 8px; }
+.setting { display: inline-flex; align-items: center; gap: 8px; }
+.setting input { width: 70px; font-family: var(--display); font-size: 10px; background: var(--base); color: var(--text); border: 2px solid var(--surface); padding: 6px; }
+.setting input:focus-visible { border-color: var(--lav); outline: none; }
+@media (prefers-reduced-motion: reduce) { .hand { transition: none; } .ticker-track { animation: none; } }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header>
+    <h1>CALLO<span>SUM</span><small>SNAKE</small></h1>
+    <div class="meta">
+      <span>LEVEL <b id="lvl">--</b></span>
+      <span>BERRIES <b id="berries">-</b></span>
+      <span>DEATHS <b id="deaths">0</b></span>
+      <span>TIME <b id="runTime">0:00.00</b></span>
+      <span>LEVEL TIME <b id="lvlTime">0:00.00</b></span>
+      <span>BEST RUN <b id="bestRun">--</b></span>
+      <span id="swapMeta" hidden>SWAP IN <b id="swapIn">5</b></span>
+    </div>
+  </header>
+
+  <div class="ticker" aria-label="Encouragement"><div class="ticker-track" id="ticker"></div></div>
+
+  <div class="screen"><canvas id="c" width="960" height="540" tabindex="0" aria-label="Callosum Snake game screen"></canvas></div>
+
+  <p class="hint" id="hint">Press <em>RETURN</em> (Enter) or click the screen to start. Keyboard required.</p>
+
+  <nav class="levels" id="levels" aria-label="Jump to level"><span class="label">JUMP TO</span></nav>
+
+  <section class="hands">
+    <div class="hand" id="handL">
+      <div class="hand-top">
+        <h2>LEFT HAND</h2>
+        <div class="drives">STEERS <span class="sw" id="swL"></span><span id="nameL">BLUE</span></div>
+      </div>
+      <div class="keys"><span class="k"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> steer</span></div>
+      <div class="tags" id="tagsL"></div>
+    </div>
+    <div class="hand" id="handR">
+      <div class="hand-top">
+        <h2>RIGHT HAND</h2>
+        <div class="drives">STEERS <span class="sw" id="swR"></span><span id="nameR">RED</span></div>
+      </div>
+      <div class="keys"><span class="k"><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> steer</span></div>
+      <div class="tags" id="tagsR"></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span class="k"><kbd>R</kbd> restart level</span>
+    <span class="k"><kbd>M</kbd> music on/off</span>
+    <span class="k"><kbd>N</kbd><kbd>P</kbd> skip level</span>
+    <span class="k">Xbox controller: <span id="padStatus">No controller found. Connect an Xbox controller over Bluetooth and press a button.</span></span>
+    <label class="k setting" for="limit">time limit <input id="limit" type="number" min="0" max="600" step="5" value="60"> sec per level (0 turns it off)</label>
+  </div>
+</main>
+
+<script>
+(() => {
+const C = {
+  crust: '#11111b', base: '#1e1e2e', checker: '#232336', surface: '#313244', overlay: '#6c7086',
+  text: '#cdd6f4', white: '#f5f3ff', sub: '#a6adc8', lav: '#b4befe', red: '#cba6f7',
+  lavDeep: '#7f86d8', mauveDeep: '#9a6fd6', deep: '#2a1f45',
+  blue: '#3d8bff', blueDeep: '#1d4fc4', red: '#ff3b4e', redDeep: '#b8152a'
+};
+const CELL = 30, W = 32, H = 18;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+/* ---------------- levels ----------------
+   Map legend (string maps, or build() painting the same characters):
+   #  outside the arena        X  wall block            .  floor
+   A  blue start           a  blue door
+   B  red start              b  red door
+   *  berry anyone can eat     l  blue orb          m  red orb
+   L  blue-only gate       M  red-only gate
+   o  crate anyone can push    u  blue crate        w  red crate
+   x  crate mark (a crate pushed onto it turns into a berry)
+   !  centre of a 3x3 trip mine
+   1-9  portal pairs (each digit appears twice)
+   movers: [x, y, dx, dy, kind] berries that bounce around the arena          */
+const G = () => Array.from({ length: H }, () => Array(W).fill('#'));
+function F(g, x, y, w, h, c = '.') { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = c; }
+function S(g, x, y, c) { g[y][x] = c; }
+
+const LEVELS = [
+  { name: 'Two Snakes', speed: 10, hint: 'Both snakes start together. Red has a wall in its way, so your hands have to do <em>different</em> things.', map: [
+    '################################',
+    '################################',
+    '###..........................###',
+    '##............................##',
+    '##............................##',
+    '##..A.....................a...##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##.............X..............##',
+    '##..B..........X..........b...##',
+    '##.............X..............##',
+    '##............................##',
+    '###..........................###',
+    '################################',
+    '################################'] },
+  { name: 'Crossing', speed: 10, dirs: ['down', 'down'], hint: 'Your doors are on the <em>opposite</em> sides. Don’t hit each other in the middle.', map: [
+    '################################',
+    '################################',
+    '###..........................###',
+    '##............................##',
+    '##............................##',
+    '##..A......................B..##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##............................##',
+    '##..b......................a..##',
+    '##............................##',
+    '##............................##',
+    '###..........................###',
+    '################################',
+    '################################'] },
+  { name: 'Hourglass', speed: 10, dirs: ['down', 'down'], hint: 'Two rooms, one narrow neck. You both have to get through it.', map: [
+    '################################',
+    '################################',
+    '##.........########.........####',
+    '##.A.......########.......B.####',
+    '##.........########.........####',
+    '##.........########.........####',
+    '##..........................####',
+    '##..........................####',
+    '##..........................####',
+    '##.........########.........####',
+    '##.........########.........####',
+    '##.b.......########.......a.####',
+    '##.........########.........####',
+    '####.......########.......######',
+    '################################',
+    '################################',
+    '################################',
+    '################################'] },
+  { name: 'Berry Patch', speed: 9, hint: 'Eat <em>every</em> berry to unlock the doors. Berries make you longer.', map: [
+    '################################',
+    '################################',
+    '###..........................###',
+    '##............................##',
+    '##..A......*.......*..........##',
+    '##.....................*......##',
+    '##.........*..............a...##',
+    '##............................##',
+    '##...*..........*.............##',
+    '##............................##',
+    '##.........*..............b...##',
+    '##.....................*......##',
+    '##..B......*..................##',
+    '##............................##',
+    '##............................##',
+    '###..........................###',
+    '################################',
+    '################################'] },
+  { name: 'Color Orbs', speed: 9, hint: 'Blue orbs belong to the left hand, red orbs to the right. The wrong snake slides right over them.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      S(g, 4, 4, 'A'); S(g, 4, 13, 'B'); S(g, 27, 8, 'a'); S(g, 27, 9, 'b');
+      [[9, 3], [15, 6], [21, 3], [12, 11], [24, 13], [18, 9]].forEach(([x, y]) => S(g, x, y, 'l'));
+      [[9, 14], [15, 11], [21, 14], [12, 6], [24, 4], [18, 8]].forEach(([x, y]) => S(g, x, y, 'm'));
+    } },
+  { name: 'Split Rhythm', speed: 10, hint: 'Separate rooms. Blue zigzags while red roams. Don’t let your hands <em>copy</em> each other.',
+    build(g) {
+      F(g, 1, 1, 30, 6);
+      [4, 12, 20].forEach(x => F(g, x, 1, 1, 4, 'X'));
+      [8, 16, 24].forEach(x => F(g, x, 3, 1, 4, 'X'));
+      S(g, 2, 1, 'A'); S(g, 29, 2, 'a');
+      [[6, 2], [10, 5], [18, 2], [22, 5]].forEach(([x, y]) => S(g, x, y, 'l'));
+      F(g, 1, 9, 30, 8);
+      S(g, 3, 12, 'B'); S(g, 28, 12, 'b');
+      [[8, 15], [14, 10], [20, 15], [25, 10]].forEach(([x, y]) => S(g, x, y, 'm'));
+    } },
+  { name: 'Stairs', speed: 10, hint: 'Now it flips. Red takes the stairs, one turn after another, while blue wanders.',
+    build(g) {
+      F(g, 1, 1, 30, 7);
+      S(g, 3, 4, 'A'); S(g, 28, 4, 'a');
+      [[8, 2], [13, 6], [19, 2], [24, 6]].forEach(([x, y]) => S(g, x, y, 'l'));
+      for (let k = 0; k < 7; k++) F(g, 2 + 4 * k, 9 + k, k === 6 ? 5 : 6, 2);
+      S(g, 3, 9, 'B'); S(g, 29, 16, 'b');
+      [[9, 11], [17, 13], [25, 15]].forEach(([x, y]) => S(g, x, y, 'm'));
+    } },
+  { name: 'Offbeat', speed: 10, hint: 'Two zigzags with <em>different</em> rhythms. Blue turns every 3 steps, red every 4.',
+    build(g) {
+      F(g, 1, 1, 30, 6);
+      for (let i = 0; i < 9; i++) { const x = 3 + 3 * i; if (i % 2 === 0) F(g, x, 1, 1, 4, 'X'); else F(g, x, 3, 1, 4, 'X'); }
+      S(g, 1, 1, 'A'); S(g, 29, 1, 'a');
+      F(g, 1, 10, 30, 7);
+      for (let i = 0; i < 7; i++) { const x = 4 + 4 * i; if (i % 2 === 0) F(g, x, 10, 1, 5, 'X'); else F(g, x, 12, 1, 5, 'X'); }
+      S(g, 2, 10, 'B'); S(g, 29, 10, 'b');
+    } },
+  { name: 'Gridlock', speed: 10, dirs: ['down', 'down'], hint: 'One-lane streets. Pick routes that don’t cross at the same moment, and remember you’re getting longer.',
+    build(g) {
+      F(g, 1, 1, 30, 16);
+      for (let y = 1; y <= 16; y++) for (let x = 1; x <= 30; x++) if (x % 3 !== 1 && y % 3 !== 1) g[y][x] = 'X';
+      S(g, 1, 1, 'A'); S(g, 28, 16, 'a'); S(g, 28, 1, 'B'); S(g, 1, 16, 'b');
+      [[13, 7], [16, 10], [7, 13], [22, 4]].forEach(([x, y]) => S(g, x, y, '*'));
+    } },
+  { name: 'Switchbacks', speed: 10, dirs: ['right', 'left'], hint: 'If you both go straight, you meet at the crossing at the <em>same moment</em>. Use a side pocket to wait.',
+    build(g) {
+      F(g, 2, 8, 29, 1); F(g, 5, 7, 3, 3);
+      F(g, 15, 2, 1, 15); F(g, 15, 2, 8, 1); F(g, 14, 4, 3, 3);
+      S(g, 2, 8, 'A'); S(g, 30, 8, 'a'); S(g, 22, 2, 'B'); S(g, 15, 16, 'b');
+      S(g, 6, 7, '*'); S(g, 16, 5, '*');
+    } },
+  { name: 'Double Helix', speed: 9, dirs: ['right', 'right'], hint: 'One long spiral passage, two lanes. Ride it side by side all the way to the middle.',
+    build(g) {
+      F(g, 1, 1, 30, 16);
+      for (let k = 0; ; k++) {
+        const l = 3 + 3 * k, t = 3 + 3 * k, r = 28 - 3 * k, b = 14 - 3 * k;
+        if (b - t < 3) break;
+        const startX = k === 0 ? l : l - 3;
+        F(g, startX, t, r - startX + 1, 1, 'X');
+        F(g, r, t, 1, b - t + 1, 'X');
+        F(g, l, b, r - l + 1, 1, 'X');
+        F(g, l, t + 3, 1, b - t - 2, 'X');
+      }
+      S(g, 1, 1, 'A'); S(g, 1, 2, 'B'); S(g, 22, 8, 'a'); S(g, 22, 9, 'b');
+      S(g, 15, 1, '*'); S(g, 15, 15, '*');
+    } },
+  { name: 'Pillars', speed: 9, hint: 'White blocks are walls. Eat everything, then find your door.', map: [
+    '################################',
+    '################################',
+    '##............................##',
+    '##.A....*.........*...........##',
+    '##............................##',
+    '##....XXXX....XXXX....XXXX....##',
+    '##....XXXX..*.XXXX..*.XXXX....##',
+    '##............................##',
+    '##..*.......*.....*......a....##',
+    '##.........................b..##',
+    '##..*.......*.....*...........##',
+    '##............................##',
+    '##....XXXX..*.XXXX..*.XXXX....##',
+    '##....XXXX....XXXX....XXXX....##',
+    '##............................##',
+    '##.B....*.........*...........##',
+    '##............................##',
+    '################################'] },
+  { name: 'Portals', speed: 9, hint: 'Matching numbers are linked. Go in one, come out the other, still heading the same way.', map: [
+    '################################',
+    '################################',
+    '##............####............##',
+    '##.A..........####.........1..##',
+    '##............####............##',
+    '##.....*......####.....*......##',
+    '##............####............##',
+    '##..2.........####........a...##',
+    '##............####............##',
+    '##............####............##',
+    '##...b........####.........2..##',
+    '##............####............##',
+    '##.....*......####.....*......##',
+    '##............####............##',
+    '##.1..........####.........B..##',
+    '##............####............##',
+    '################################',
+    '################################'] },
+  { name: 'Donut', speed: 8, hint: 'A ring with shortcuts. Grow long, stay out of each other’s way.', map: [
+    '################################',
+    '################################',
+    '##............................##',
+    '##.A....*........*.........1..##',
+    '##............................##',
+    '##....##################......##',
+    '##.*..##################...*..##',
+    '##....##################......##',
+    '##.2..##################......##',
+    '##....##################...2..##',
+    '##.*..##################...*..##',
+    '##....##################......##',
+    '##............................##',
+    '##.1.....*........*.......B...##',
+    '##............................##',
+    '##..b......................a..##',
+    '################################',
+    '################################'] },
+  { name: 'Ping Pong', speed: 9, moverEvery: 2, hint: 'The orbs won’t sit still. Blue’s slide side to side, red’s bounce up and down.',
+    movers: [[5, 2, 1, 0, 'l'], [25, 4, -1, 0, 'l'], [12, 6, 1, 0, 'l'], [8, 10, 0, 1, 'm'], [16, 16, 0, -1, 'm'], [24, 12, 0, 1, 'm']],
+    build(g) {
+      F(g, 1, 1, 30, 7); S(g, 2, 4, 'A'); S(g, 29, 4, 'a');
+      F(g, 1, 10, 30, 7); S(g, 2, 13, 'B'); S(g, 29, 13, 'b');
+    } },
+  { name: 'Bouncers', speed: 9, moverEvery: 2, hint: 'Berries ricochet <em>diagonally</em> off every wall. Cut them off.',
+    movers: [[6, 5, 1, 1, '*'], [25, 5, -1, 1, '*'], [10, 12, 1, -1, '*'], [22, 12, -1, -1, '*']],
+    build(g) {
+      F(g, 2, 2, 28, 14); F(g, 15, 7, 2, 4, 'X');
+      S(g, 4, 3, 'A'); S(g, 27, 14, 'a'); S(g, 4, 14, 'B'); S(g, 27, 3, 'b');
+    } },
+  { name: 'Minefield', speed: 9, hint: 'Touch a dotted square and its mine goes off <em>3 moves later</em>. Be out of it by then.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      [[10, 5], [10, 12], [16, 8], [22, 4], [22, 12]].forEach(([x, y]) => S(g, x, y, '!'));
+      S(g, 4, 6, 'A'); S(g, 28, 6, 'a'); S(g, 4, 11, 'B'); S(g, 28, 11, 'b');
+      S(g, 16, 3, '*'); S(g, 16, 14, '*');
+    } },
+  { name: 'Mine Run', speed: 10, hint: 'Each gap is mined. Brush the <em>corner</em> of a mine to set it off, get clear, then go through.',
+    build(g) {
+      F(g, 1, 1, 30, 7);
+      [10, 20].forEach(x => { F(g, x, 1, 1, 2, 'X'); F(g, x, 6, 1, 2, 'X'); S(g, x, 4, '!'); });
+      S(g, 2, 4, 'A'); S(g, 29, 4, 'a');
+      F(g, 1, 10, 30, 7);
+      [13, 24].forEach(x => { F(g, x, 10, 1, 2, 'X'); F(g, x, 15, 1, 2, 'X'); S(g, x, 13, '!'); });
+      S(g, 2, 13, 'B'); S(g, 29, 13, 'b');
+    } },
+  { name: 'First Push', speed: 10, hint: 'Push crates onto the <em>marks</em> to turn them into berries. Shoving a crate into a wall is a crash.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      S(g, 10, 5, 'o'); S(g, 14, 5, 'x'); S(g, 10, 12, 'o'); S(g, 14, 12, 'x'); S(g, 20, 8, 'o'); S(g, 24, 8, 'x');
+      S(g, 4, 5, 'A'); S(g, 27, 3, 'a'); S(g, 4, 12, 'B'); S(g, 27, 14, 'b');
+    } },
+  { name: 'Color Crates', speed: 10, hint: 'Only blue can push blue crates, only red can push red ones. Hit the wrong one and you crash.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      S(g, 10, 4, 'u'); S(g, 14, 4, 'x'); S(g, 10, 13, 'w'); S(g, 14, 13, 'x');
+      S(g, 20, 6, 'w'); S(g, 20, 10, 'x'); S(g, 23, 11, 'u'); S(g, 23, 7, 'x');
+      S(g, 3, 4, 'A'); S(g, 28, 15, 'a'); S(g, 3, 13, 'B'); S(g, 28, 2, 'b');
+    } },
+  { name: 'Gates', speed: 9, dirs: ['down', 'down'], hint: 'Blue walks through blue walls, red through red walls. Each wall has one gap for the other snake.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      F(g, 11, 3, 1, 13, 'L'); F(g, 20, 2, 1, 13, 'M');
+      S(g, 5, 4, 'A'); S(g, 25, 13, 'a'); S(g, 26, 4, 'B'); S(g, 5, 13, 'b');
+      S(g, 25, 6, 'l'); S(g, 6, 6, 'm'); S(g, 15, 8, '*');
+    } },
+  { name: 'Jailbreak', speed: 11, dirs: ['right', 'down'], hint: 'Red is locked in. Blue has to shove the blue crates out of the doorway. Red, keep circling.',
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      F(g, 18, 7, 5, 5, 'X'); F(g, 19, 8, 3, 3); S(g, 18, 9, '.');
+      S(g, 17, 9, 'u'); S(g, 16, 9, 'u');
+      S(g, 19, 8, 'B'); S(g, 21, 10, 'm'); S(g, 21, 8, 'm'); S(g, 4, 14, 'b');
+      S(g, 4, 3, 'A'); S(g, 27, 14, 'a');
+    } },
+  { name: 'Mirror', speed: 9, mods: { mirrorB: true }, hint: 'The right hand is <em>mirrored</em>. J steers right, L steers left.', map: [
+    '################################',
+    '################################',
+    '###########..........###########',
+    '###########.A......B.###########',
+    '###########..........###########',
+    '###########...*..*...###########',
+    '##............................##',
+    '##..*......................*..##',
+    '##.b........................a.##',
+    '##............................##',
+    '##....*.........**.......*....##',
+    '##............................##',
+    '###########...*..*...###########',
+    '###########..........###########',
+    '###########..........###########',
+    '###########..........###########',
+    '################################',
+    '################################'] },
+  { name: 'Upside', speed: 9, mods: { flipB: true }, hint: 'The right hand is <em>upside-down</em>. I steers down, K steers up.', map: [
+    '################################',
+    '################################',
+    '##.......##############.......##',
+    '##.A.....##############.....B.##',
+    '##.......##############.......##',
+    '##...*...##############...*...##',
+    '##.......##############.......##',
+    '##.......##############.......##',
+    '##...*...##############...*...##',
+    '##.......##############.......##',
+    '##............................##',
+    '##..*......*.......*.......*..##',
+    '##............................##',
+    '##............b.a.............##',
+    '##............................##',
+    '################################',
+    '################################',
+    '################################'] },
+  { name: 'Swap', speed: 9, mods: { swap: true }, hint: 'Every 5 seconds your hands <em>trade snakes</em>. Three beeps, then the switch.', map: [
+    '################################',
+    '################################',
+    '##............................##',
+    '##.A..........................##',
+    '##.....*.....XX.....*.........##',
+    '##...........XX...............##',
+    '##..XXXX.....XX.....XXXX......##',
+    '##.......*..........*.........##',
+    '##............a.b.............##',
+    '##.......*..........*.........##',
+    '##..XXXX.....XX.....XXXX......##',
+    '##...........XX...............##',
+    '##.....*.....XX.....*.........##',
+    '##............................##',
+    '##.B..........................##',
+    '##............................##',
+    '################################',
+    '################################'] },
+  { name: 'Brainstem', speed: 8, mods: { mirrorB: true, flipB: true }, hint: 'Red is mirrored <em>and</em> upside-down. Hell yeah, Willem.', map: [
+    '################################',
+    '################################',
+    '##..................############',
+    '##.A......*.........############',
+    '##..................############',
+    '##.1...*......*.....############',
+    '##..............b...############',
+    '#########............###########',
+    '#########....*.......###########',
+    '#########............###########',
+    '############...*........########',
+    '############..................##',
+    '############...a......*.....1.##',
+    '############..................##',
+    '############.....*......*...B.##',
+    '############..................##',
+    '################################',
+    '################################'] },
+  { name: 'Final Exam', speed: 9, moverEvery: 2, hint: 'Gates, a mine, a crate, a bouncing berry and a portal. Everything at once.',
+    movers: [[21, 11, 1, 1, '*']],
+    build(g) {
+      F(g, 2, 2, 28, 14);
+      F(g, 16, 2, 1, 7, 'L'); F(g, 16, 9, 1, 7, 'M');
+      S(g, 8, 8, '!');
+      S(g, 22, 5, 'o'); S(g, 26, 5, 'x');
+      S(g, 3, 15, '1'); S(g, 28, 2, '1');
+      S(g, 4, 4, 'A'); S(g, 27, 13, 'a'); S(g, 4, 12, 'B'); S(g, 27, 4, 'b');
+    } }
+];
+
+/* ---------------- audio ---------------- */
+let ac = null, master, musicGain, sfxIn, noiseBuf, pulse, musicOn = true;
+let step = 0, nextT = 0;
+const STEP = 60 / 152 / 4;
+const mf = m => 440 * Math.pow(2, (m - 69) / 12);
+function initAudio() {
+  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  master = ac.createGain(); master.gain.value = 0.55; master.connect(ac.destination);
+  musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.3 : 0; musicGain.connect(master);
+  sfxIn = ac.createGain();
+  const crush = ac.createWaveShaper();
+  const n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.round(x * 7) / 7; }
+  crush.curve = curve;
+  const post = ac.createGain(); post.gain.value = 0.55;
+  sfxIn.connect(crush).connect(post).connect(master);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const re = new Float32Array(48), im = new Float32Array(48);
+  for (let k = 1; k < 48; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * 0.25);
+  pulse = ac.createPeriodicWave(re, im);
+  nextT = ac.currentTime + 0.08;
+  setInterval(sched, 25);
+}
+function tone(f, t, dur, o = {}) {
+  if (!ac) return;
+  const osc = ac.createOscillator();
+  if (o.wave) osc.setPeriodicWave(o.wave); else osc.type = o.type || 'square';
+  osc.frequency.setValueAtTime(f, t);
+  if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(o.gain ?? 0.2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g).connect(o.dest || sfxIn);
+  osc.start(t); osc.stop(t + dur + 0.02);
+}
+function noise(t, dur, o = {}) {
+  if (!ac) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = o.ft || 'highpass'; f.frequency.value = o.freq || 1000;
+  const g = ac.createGain(); g.gain.setValueAtTime(o.gain ?? 0.2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(o.dest || sfxIn);
+  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+}
+const PROG = [[57,60,64],[53,57,60],[48,52,55],[55,59,62],[57,60,64],[53,57,60],[55,59,62],[52,56,59]];
+const ARP = [0,2,4,2, 1,3,4,-1, 0,2,4,5, 4,2,1,-1];
+const ARP2 = [5,4,2,4, 3,-1,2,0, 1,2,-1,4, 5,-1,4,2];
+function sched() {
+  while (nextT < ac.currentTime + 0.15) { playStep(step, nextT); nextT += STEP; step = (step + 1) % 256; }
+}
+function playStep(s, t) {
+  const bar = Math.floor(s / 16) % 8, half = Math.floor(s / 128), i = s % 16, ch = PROG[bar];
+  const tones = [...ch.map(n => n + 12), ...ch.map(n => n + 24)];
+  const a = (half ? ARP2 : ARP)[i];
+  if (a >= 0) tone(mf(tones[a]), t, 0.09, { wave: pulse, gain: 0.07, dest: musicGain });
+  if (i % 2 === 0) tone(mf(ch[0] - 12 + (i % 4 === 2 ? 12 : 0)), t, 0.15, { type: 'triangle', gain: 0.24, dest: musicGain });
+  if (i === 0 || i === 8 || i === 11) tone(150, t, 0.12, { type: 'sine', slide: 42, gain: 0.55, dest: musicGain });
+  if (i === 4 || i === 12) noise(t, 0.11, { ft: 'bandpass', freq: 1800, gain: 0.28, dest: musicGain });
+  if (i % 2 === 1) noise(t, 0.03, { ft: 'highpass', freq: 7500, gain: 0.09, dest: musicGain });
+}
+const sfx = {
+  turn(id) { if (!ac) return; tone(id ? 300 : 450, ac.currentTime, 0.04, { wave: pulse, gain: 0.12 }); },
+  eat(id, len) { if (!ac) return; const t = ac.currentTime, b = (id ? 392 : 523) * Math.pow(1.06, Math.min(len, 14));
+    tone(b, t, 0.08, { wave: pulse, gain: 0.3 }); tone(b * 2, t + 0.05, 0.09, { wave: pulse, gain: 0.22 }); noise(t, 0.04, { ft: 'lowpass', freq: 1800, gain: 0.35 }); },
+  warp() { if (!ac) return; const t = ac.currentTime; tone(1600, t, 0.14, { type: 'square', slide: 200, gain: 0.22 }); },
+  unlock() { if (!ac) return; const t = ac.currentTime; [659, 784, 988].forEach((f, k) => tone(f, t + k * 0.06, 0.12, { wave: pulse, gain: 0.25 })); },
+  death() { if (!ac) return; const t = ac.currentTime; tone(420, t, 0.45, { type: 'square', slide: 50, gain: 0.35 }); noise(t, 0.35, { ft: 'lowpass', freq: 900, gain: 0.5 }); },
+  door(id) { if (!ac) return; const t = ac.currentTime; const b = id ? 660 : 880; tone(b, t, 0.08, { wave: pulse, gain: 0.25 }); tone(b * 1.5, t + 0.06, 0.14, { wave: pulse, gain: 0.25 }); },
+  win() { if (!ac) return; const t = ac.currentTime; [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, t + k * 0.07, 0.14, { wave: pulse, gain: 0.28 })); },
+  warn() { if (!ac) return; tone(1250, ac.currentTime, 0.05, { type: 'square', gain: 0.22 }); },
+  tick() { if (!ac) return; tone(990, ac.currentTime, 0.06, { type: 'square', gain: 0.2 }); },
+  swap() { if (!ac) return; const t = ac.currentTime; tone(180, t, 0.18, { type: 'sawtooth', slide: 1800, gain: 0.3 }); noise(t, 0.18, { ft: 'bandpass', freq: 3000, gain: 0.4 }); },
+  push() { if (!ac) return; noise(ac.currentTime, 0.05, { ft: 'lowpass', freq: 600, gain: 0.4 }); },
+  arm() { if (!ac) return; const t = ac.currentTime; tone(1500, t, 0.05, { type: 'square', gain: 0.25 }); tone(1500, t + 0.08, 0.05, { type: 'square', gain: 0.25 }); },
+  armTick() { if (!ac) return; tone(1200, ac.currentTime, 0.04, { type: 'square', gain: 0.2 }); },
+  boom() { if (!ac) return; const t = ac.currentTime; noise(t, 0.5, { ft: 'lowpass', freq: 700, gain: 0.7 }); tone(120, t, 0.4, { type: 'square', slide: 30, gain: 0.4 }); },
+  go() { if (!ac) return; tone(1320, ac.currentTime, 0.15, { wave: pulse, gain: 0.3 }); },
+  start() { if (!ac) return; const t = ac.currentTime; tone(262, t, 0.1, { wave: pulse, gain: 0.3 }); tone(392, t + 0.08, 0.16, { wave: pulse, gain: 0.3 }); }
+};
+
+/* ---------------- willem + timing + settings ---------------- */
+const CHEERS = [
+  'WILLEM IS AWESOME', "WILLEM'S THE BEST", 'HELL YEAH, WILLEM', 'BOTH HEMISPHERES BELIEVE IN WILLEM',
+  'WILLEM CHARMS TWO SNAKES AT ONCE', 'NOBODY SYNCS LIKE WILLEM', 'WILLEM: AMBIDEXTROUS LEGEND',
+  'TRUST THE PROCESS. TRUST WILLEM.', 'WILLEM NEVER GIVES UP', 'LEFT HAND, RIGHT HAND, ALL WILLEM'
+];
+const DEATH_LINES = ['WILLEM IS AWESOME', "WILLEM'S THE BEST", 'HELL YEAH, WILLEM', 'STILL AWESOME, WILLEM', 'WILLEM > WALLS'];
+(() => { const h = CHEERS.map(s => `<span>${s}</span>`).join(''); document.getElementById('ticker').innerHTML = h + h; })();
+
+let runFrames = 0, levelFrames = 0, skipped = false, deathLine = '', deathReason = '', lastLevelTime = 0, newBest = false;
+let limitSec = 60, levelLeft = 0, lastBeepSec = -1;
+let bests = { run: null, levels: {} };
+try { const s = JSON.parse(localStorage.getItem('callosum-snake-bests') || 'null'); if (s && typeof s === 'object') bests = { run: s.run ?? null, levels: s.levels || {} }; } catch (e) {}
+try { const v = parseInt(localStorage.getItem('callosum-snake-limit'), 10); if (v >= 0) limitSec = v; } catch (e) {}
+function saveBests() { try { localStorage.setItem('callosum-snake-bests', JSON.stringify(bests)); } catch (e) {} }
+function fmt(fr) {
+  const cs = Math.floor(fr * 100 / 60), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
+  return m + ':' + String(s).padStart(2, '0') + '.' + String(c).padStart(2, '0');
+}
+function updateTimes() {
+  document.getElementById('runTime').textContent = fmt(runFrames);
+  document.getElementById('lvlTime').textContent = fmt(levelFrames);
+  document.getElementById('bestRun').textContent = bests.run == null ? '--' : fmt(bests.run);
+}
+const limitInput = document.getElementById('limit');
+limitInput.value = limitSec;
+limitInput.addEventListener('change', () => {
+  let v = parseInt(limitInput.value, 10);
+  if (!(v >= 0)) v = 60;
+  limitSec = Math.min(600, v); limitInput.value = limitSec;
+  try { localStorage.setItem('callosum-snake-limit', String(limitSec)); } catch (e) {}
+  levelLeft = limitSec * 60; lastBeepSec = -1;
+});
+limitInput.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { limitInput.blur(); cv.focus(); } });
+
+/* ---------------- input ---------------- */
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+const KEYMAP = {
+  KeyW: [0, 'up'], KeyA: [0, 'left'], KeyS: [0, 'down'], KeyD: [0, 'right'],
+  KeyI: [1, 'up'], KeyJ: [1, 'left'], KeyK: [1, 'down'], KeyL: [1, 'right']
+};
+const BLOCK = new Set(['Tab', 'Backspace', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (BLOCK.has(e.code)) e.preventDefault();
+  initAudio();
+  if (e.repeat) return;
+  const km = KEYMAP[e.code];
+  if (km && state === 'play') { steer(km[0], km[1]); return; }
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && (state === 'title' || state === 'end')) startRun();
+  else if (e.code === 'KeyM') toggleMusic();
+  else if (state === 'play' || state === 'dead' || state === 'clear') {
+    if (e.code === 'KeyR') loadLevel(levelIndex);
+    if (e.code === 'KeyN') { skipped = true; loadLevel((levelIndex + 1) % LEVELS.length); }
+    if (e.code === 'KeyP') { skipped = true; loadLevel((levelIndex - 1 + LEVELS.length) % LEVELS.length); }
+  }
+}, { capture: true });
+cv.addEventListener('pointerdown', () => { cv.focus(); initAudio(); if (state === 'title' || state === 'end') startRun(); });
+function toggleMusic() { musicOn = !musicOn; if (musicGain) musicGain.gain.value = musicOn ? 0.3 : 0; }
+
+/* ---------------- gamepads (Xbox layout) ----------------
+   One pad:  left stick / D-pad steers blue, right stick / Y X A B steers red.
+   Two pads: pad 1 steers blue, pad 2 steers red (stick or D-pad).
+   Menu = start, View = restart level, LB / RB = previous / next level.            */
+const padPrev = {};
+let padCount = 0;
+function readPads() {
+  try { return navigator.getGamepads ? [...navigator.getGamepads()].filter(p => p && p.connected) : []; } catch (e) { return []; }
+}
+function pollPads() {
+  const pads = readPads();
+  if (pads.length !== padCount) { padCount = pads.length; updatePadStatus(); }
+  if (!pads.length) return;
+  const btn = (p, i) => !!(p.buttons[i] && p.buttons[i].pressed);
+  const stick = (x, y) => (Math.abs(x) < 0.55 && Math.abs(y) < 0.55) ? null : Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
+  const dpad = p => btn(p, 12) ? 'up' : btn(p, 13) ? 'down' : btn(p, 14) ? 'left' : btn(p, 15) ? 'right' : null;
+  const face = p => btn(p, 3) ? 'up' : btn(p, 0) ? 'down' : btn(p, 2) ? 'left' : btn(p, 1) ? 'right' : null;
+  const inputs = [];
+  if (pads.length >= 2) {
+    for (let i = 0; i < 2; i++) { const p = pads[i]; inputs.push([i, dpad(p) || face(p) || stick(p.axes[0] || 0, p.axes[1] || 0), 'h' + i]); }
+  } else {
+    const p = pads[0];
+    inputs.push([0, dpad(p) || stick(p.axes[0] || 0, p.axes[1] || 0), 'h0']);
+    inputs.push([1, face(p) || stick(p.axes[2] || 0, p.axes[3] || 0), 'h1']);
+  }
+  for (const [ctrl, d, key] of inputs) {
+    if (d && d !== padPrev[key] && state === 'play') steer(ctrl, d);
+    padPrev[key] = d;
+  }
+  for (const p of pads) {
+    const id = p.index, edge = (i, k) => { const v = btn(p, i), was = padPrev[k + id]; padPrev[k + id] = v; return v && !was; };
+    const menu = edge(9, 'menu'), view = edge(8, 'view'), a = edge(0, 'a'), lb = edge(4, 'lb'), rb = edge(5, 'rb');
+    if ((menu || a) && (state === 'title' || state === 'end')) { initAudio(); startRun(); }
+    else if (state === 'play' || state === 'dead' || state === 'clear') {
+      if (view) loadLevel(levelIndex);
+      if (rb) { skipped = true; loadLevel((levelIndex + 1) % LEVELS.length); }
+      if (lb) { skipped = true; loadLevel((levelIndex - 1 + LEVELS.length) % LEVELS.length); }
+    }
+  }
+}
+function updatePadStatus() {
+  const el = document.getElementById('padStatus');
+  el.textContent = padCount === 0 ? 'No controller found. Connect an Xbox controller over Bluetooth and press a button.'
+    : padCount === 1 ? '1 controller: left stick or D-pad steers blue, right stick or Y X A B steers red.'
+    : '2 controllers: controller 1 steers blue, controller 2 steers red.';
+}
+addEventListener('gamepadconnected', () => { padCount = readPads().length; updatePadStatus(); });
+addEventListener('gamepaddisconnected', () => { padCount = readPads().length; updatePadStatus(); });
+
+function steer(ctrl, dir) {
+  const s = snakes[swapped ? 1 - ctrl : ctrl];
+  if (!s || s.frozen) return;
+  if (s.id === 1 && lvl.mods.mirrorB && (dir === 'left' || dir === 'right')) dir = OPP[dir];
+  if (s.id === 1 && lvl.mods.flipB && (dir === 'up' || dir === 'down')) dir = OPP[dir];
+  if (readyT > 0) { if (s.dir !== dir) { s.dir = dir; sfx.turn(s.id); } return; }
+  const last = s.queue.length ? s.queue[s.queue.length - 1] : s.dir;
+  if (dir === last) return;
+  if (last && dir === OPP[last]) return;
+  if (s.queue.length >= 3) return;
+  s.queue.push(dir);
+  sfx.turn(s.id);
+}
+
+/* ---------------- game state ---------------- */
+let state = 'title', levelIndex = 0, deaths = 0, lvl = null;
+let tiles = [], berries = [], portals = {}, goals = [], snakes = [], boxes = [], targets = [], mines = [], totalItems = 0;
+let swapped = false, swapT = 0, readyT = 0, deadT = 0, clearT = 0, glitch = 0, shake = 0, tick = 0, stepT = 0, stepCount = 0, lastSwapIn = -1;
+let deadSnake = null;
+const parts = [];
+const READY = 150;
+
+function levelRows(L) {
+  if (L.map) return L.map;
+  const g = G(); L.build(g); return g.map(r => r.join(''));
+}
+function parseLevel(L) {
+  tiles = []; berries = []; portals = {}; goals = [null, null]; boxes = []; targets = []; mines = [];
+  const starts = [null, null], pairs = {}, rows = levelRows(L);
+  for (let y = 0; y < H; y++) {
+    const row = (rows[y] || '').padEnd(W, '#').slice(0, W);
+    tiles.push([]);
+    for (let x = 0; x < W; x++) {
+      const ch = row[x];
+      tiles[y].push(ch === '#' ? '#' : ch === 'X' ? 'X' : ch === 'L' ? 'L' : ch === 'M' ? 'M' : '.');
+      if (ch === 'A') starts[0] = [x, y];
+      else if (ch === 'B') starts[1] = [x, y];
+      else if (ch === 'a') goals[0] = { x, y };
+      else if (ch === 'b') goals[1] = { x, y };
+      else if (ch === '*' || ch === 'l' || ch === 'm') berries.push({ x, y, k: ch, ph: Math.random() * 6 });
+      else if (ch === 'o' || ch === 'u' || ch === 'w') boxes.push({ x, y, k: ch, px: x, py: y });
+      else if (ch === 'x') targets.push({ x, y });
+      else if (ch === '!') mines.push({ x, y, count: 0, armed: false });
+      else if (ch >= '1' && ch <= '9') (pairs[ch] = pairs[ch] || []).push([x, y]);
+    }
+  }
+  for (const k in pairs) if (pairs[k].length === 2) {
+    const [p, q] = pairs[k];
+    portals[p[0] + ',' + p[1]] = { to: q, n: k };
+    portals[q[0] + ',' + q[1]] = { to: p, n: k };
+  }
+  for (const m of (L.movers || [])) berries.push({ x: m[0], y: m[1], dx: m[2], dy: m[3], k: m[4], ph: Math.random() * 6, px: m[0], py: m[1] });
+  totalItems = berries.length + targets.length;
+  return starts;
+}
+const passable = (s, x, y) => {
+  if (x < 0 || y < 0 || x >= W || y >= H) return false;
+  const t = tiles[y][x];
+  return t === '.' || (t === 'L' && s.id === 0) || (t === 'M' && s.id === 1);
+};
+const boxAt = (x, y) => boxes.find(b => b.x === x && b.y === y);
+const berryAt = (x, y) => berries.find(b => b.x === x && b.y === y);
+const segAt = (x, y) => snakes.some(s => s.body.some(c => c[0] === x && c[1] === y));
+function autoDir(s, at) {
+  let best = 'right', bestRun = -1;
+  for (const d of ['right', 'left', 'down', 'up']) {
+    let [x, y] = at, run = 0;
+    for (;;) { x += DIRS[d][0]; y += DIRS[d][1]; if (!passable(s, x, y) || boxAt(x, y)) break; run++; }
+    if (run > bestRun) { bestRun = run; best = d; }
+  }
+  return best;
+}
+function mkSnake(id, at, dir) {
+  const body = [at.slice(), at.slice(), at.slice()];
+  const s = { id, body, prev: body.map(c => c.slice()), dir: null, queue: [], frozen: false,
+    color: id ? C.red : C.blue, deep: id ? C.redDeep : C.blueDeep, blink: 0 };
+  s.dir = dir || autoDir(s, at);
+  return s;
+}
+function loadLevel(i) {
+  if (i !== levelIndex || state === 'title' || state === 'end' || state === 'clear') levelFrames = 0;
+  levelIndex = i; lvl = LEVELS[i];
+  lvl.mods = lvl.mods || {};
+  const starts = parseLevel(lvl);
+  snakes = [];
+  snakes = [mkSnake(0, starts[0], lvl.dirs && lvl.dirs[0]), mkSnake(1, starts[1], lvl.dirs && lvl.dirs[1])];
+  swapped = false; swapT = 0; readyT = READY; deadT = 0; clearT = 0; stepT = 0; stepCount = 0; deadSnake = null; parts.length = 0;
+  levelLeft = limitSec * 60; lastBeepSec = -1; lastReady = -1;
+  state = 'play';
+  updateHud(true); markLevelButtons();
+}
+let lastReady = -1;
+function startRun() { deaths = 0; runFrames = 0; skipped = false; newBest = false; sfx.start(); state = 'title'; loadLevel(0); }
+function jumpTo(i) {
+  initAudio();
+  if (state === 'title' || state === 'end') { deaths = 0; runFrames = 0; newBest = false; skipped = i !== 0; }
+  else skipped = true;
+  loadLevel(i);
+  cv.focus();
+}
+const levelNav = document.getElementById('levels');
+LEVELS.forEach((L, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'lv' + i; b.textContent = String(i + 1).padStart(2, '0'); b.title = L.name;
+  b.addEventListener('click', () => jumpTo(i));
+  levelNav.appendChild(b);
+});
+function markLevelButtons() {
+  LEVELS.forEach((_, i) => document.getElementById('lv' + i).setAttribute('aria-current', String(i === levelIndex && state !== 'title' && state !== 'end')));
+}
+
+const goalsOpen = () => berries.length === 0 && targets.length === 0;
+const canEat = (s, b) => b.k === '*' || (b.k === 'l' && s.id === 0) || (b.k === 'm' && s.id === 1);
+const canPush = (s, b) => b.k === 'o' || (b.k === 'u' && s.id === 0) || (b.k === 'w' && s.id === 1);
+const inMine = (m, x, y) => Math.abs(x - m.x) <= 1 && Math.abs(y - m.y) <= 1;
+
+function burst(x, y, color, n, speed) {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * speed;
+    parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 36, max: 36, c: k % 3 ? color : C.white, s: 3 });
+  }
+}
+const cx = x => x * CELL + CELL / 2, cy = y => y * CELL + CELL / 2;
+
+function eatBerry(s, b) {
+  berries.splice(berries.indexOf(b), 1);
+  sfx.eat(s.id, s.body.length);
+  burst(cx(b.x), cy(b.y), b.k === 'l' ? C.blue : b.k === 'm' ? C.red : C.white, 12, 3);
+  checkUnlock();
+  updateHud();
+}
+function checkUnlock() {
+  if (goalsOpen() && totalItems > 0 && !unlockedFx) { unlockedFx = true; sfx.unlock(); for (const g of goals) burst(cx(g.x), cy(g.y), C.white, 16, 3); }
+}
+let unlockedFx = false;
+
+function stepSnakes() {
+  stepCount++;
+  for (const b of boxes) { b.px = b.x; b.py = b.y; }
+  for (const b of berries) { b.px = b.x; b.py = b.y; }
+  const moves = [];
+  for (const s of snakes) {
+    s.prev = s.body.map(c => c.slice());
+    if (s.frozen) continue;
+    if (s.queue.length) s.dir = s.queue.shift();
+    const [dx, dy] = DIRS[s.dir];
+    let nx = s.body[0][0] + dx, ny = s.body[0][1] + dy, warped = false;
+    const p = portals[nx + ',' + ny];
+    if (p) { nx = p.to[0]; ny = p.to[1]; warped = true; }
+    moves.push({ s, nx, ny, warped });
+  }
+  // crates
+  for (const m of moves) {
+    const bx = boxAt(m.nx, m.ny);
+    if (!bx) continue;
+    if (!canPush(m.s, bx)) { die(m.s); return; }
+    const [dx, dy] = DIRS[m.s.dir], tx = bx.x + dx, ty = bx.y + dy;
+    const free = tx >= 0 && ty >= 0 && tx < W && ty < H && tiles[ty][tx] === '.' && !portals[tx + ',' + ty] && !boxAt(tx, ty) && !berryAt(tx, ty) && !segAt(tx, ty);
+    if (!free) { die(m.s); return; }
+    bx.x = tx; bx.y = ty; sfx.push();
+    const ti = targets.findIndex(t => t.x === tx && t.y === ty);
+    if (ti >= 0) {
+      targets.splice(ti, 1); boxes.splice(boxes.indexOf(bx), 1);
+      berries.push({ x: tx, y: ty, k: bx.k === 'u' ? 'l' : bx.k === 'w' ? 'm' : '*', ph: 0, px: tx, py: ty });
+      sfx.unlock(); burst(cx(tx), cy(ty), C.white, 14, 3);
+      updateHud();
+    }
+  }
+  for (const m of moves) {
+    const b = berryAt(m.nx, m.ny);
+    m.berry = b && canEat(m.s, b) ? b : null;
+    m.s.body.unshift([m.nx, m.ny]);
+    if (!m.berry) m.s.body.pop();
+  }
+  for (const m of moves) {
+    const s = m.s, [hx, hy] = s.body[0];
+    let dead = !passable(s, hx, hy);
+    for (let i = 1; i < s.body.length && !dead; i++) if (s.body[i][0] === hx && s.body[i][1] === hy) dead = true;
+    for (const c of snakes[1 - s.id].body) if (!dead && c[0] === hx && c[1] === hy) dead = true;
+    if (dead) { die(s); return; }
+  }
+  for (const m of moves) {
+    if (m.berry && berries.includes(m.berry)) eatBerry(m.s, m.berry);
+    if (m.warped) { sfx.warp(); burst(cx(m.nx), cy(m.ny), m.s.color, 8, 2); }
+  }
+  // mines: armed ones tick down, then fresh triggers
+  for (const mine of mines.slice()) {
+    if (!mine.armed) continue;
+    mine.count--;
+    if (mine.count <= 0) {
+      mines.splice(mines.indexOf(mine), 1);
+      sfx.boom(); shake = 10;
+      for (let k = 0; k < 3; k++) burst(cx(mine.x), cy(mine.y), k ? C.mauve : C.white, 14, 6);
+      const hit = snakes.find(s => s.body.some(c => inMine(mine, c[0], c[1])));
+      if (hit) { die(hit, 'mine'); return; }
+    } else sfx.armTick();
+  }
+  for (const mine of mines) {
+    if (mine.armed) continue;
+    if (moves.some(m => inMine(mine, m.s.body[0][0], m.s.body[0][1]))) { mine.armed = true; mine.count = 3; sfx.arm(); }
+  }
+  // bouncing berries
+  if (berries.some(b => b.dx !== undefined) && stepCount % (lvl.moverEvery || 2) === 0) {
+    for (const b of berries.slice()) {
+      if (b.dx === undefined) continue;
+      const tries = [[b.dx, b.dy], [-b.dx, b.dy], [b.dx, -b.dy], [-b.dx, -b.dy]];
+      for (const [dx, dy] of tries) {
+        const tx = b.x + dx, ty = b.y + dy;
+        const head = snakes.find(s => !s.frozen && s.body[0][0] === tx && s.body[0][1] === ty);
+        if (head && canEat(head, b)) {
+          b.x = tx; b.y = ty; head.body.push(head.body[head.body.length - 1].slice());
+          head.prev.push(head.prev[head.prev.length - 1].slice());
+          eatBerry(head, b); break;
+        }
+        const blocked = tx < 0 || ty < 0 || tx >= W || ty >= H || tiles[ty][tx] !== '.' || portals[tx + ',' + ty] || boxAt(tx, ty) || berryAt(tx, ty) || segAt(tx, ty) || targets.some(t => t.x === tx && t.y === ty);
+        if (!blocked) { b.x = tx; b.y = ty; b.dx = dx; b.dy = dy; break; }
+      }
+    }
+  }
+  // doors
+  for (const m of moves) {
+    const s = m.s, g = goals[s.id];
+    if (goalsOpen() && s.body[0][0] === g.x && s.body[0][1] === g.y) {
+      s.frozen = true; s.queue = [];
+      sfx.door(s.id); burst(cx(g.x), cy(g.y), s.color, 18, 3);
+      updateHud();
+    }
+  }
+  if (snakes.every(s => s.frozen)) {
+    state = 'clear'; clearT = 90; sfx.win();
+    lastLevelTime = levelFrames;
+    const prev = bests.levels[levelIndex];
+    if (prev == null || levelFrames < prev) { bests.levels[levelIndex] = levelFrames; saveBests(); }
+    if (levelIndex + 1 === LEVELS.length && !skipped && (bests.run == null || runFrames < bests.run)) { bests.run = runFrames; newBest = true; saveBests(); }
+  }
+}
+
+function die(s, reason) {
+  if (state !== 'play') return;
+  deathReason = reason || ''; deadSnake = s || null;
+  state = 'dead'; deadT = reason === 'time' ? 90 : 75; deaths++; shake = 12; glitch = 10;
+  deathLine = DEATH_LINES[Math.floor(Math.random() * DEATH_LINES.length)];
+  sfx.death();
+  for (const sn of (s ? [s] : snakes)) for (const c of sn.body) burst(cx(c[0]), cy(c[1]), sn.color, 4, 4);
+  updateHud();
+}
+
+function update() {
+  tick++;
+  pollPads();
+  if (state === 'play' && readyT > 0) {
+    readyT--;
+    const n = Math.ceil(readyT / 50);
+    if (n !== lastReady) { lastReady = n; if (n > 0) sfx.tick(); else sfx.go(); }
+    if (readyT === 0) unlockedFx = false;
+  } else if (state === 'play' || state === 'dead') { runFrames++; levelFrames++; if (tick % 3 === 0) updateTimes(); }
+  if (state === 'play' && readyT === 0) {
+    if (lvl.mods.swap) {
+      swapT++;
+      const ph = swapT % 300;
+      if (ph === 240 || ph === 260 || ph === 280) sfx.warn();
+      if (ph === 0) {
+        swapped = !swapped; sfx.swap(); glitch = 18; shake = 5; updateHud();
+        for (const id of ['handL', 'handR']) { const el = document.getElementById(id); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 300); }
+      }
+      const left = Math.ceil((300 - ph) / 60);
+      if (left !== lastSwapIn) { lastSwapIn = left; document.getElementById('swapIn').textContent = left; }
+    }
+    if (limitSec > 0) {
+      levelLeft--;
+      const s = Math.ceil(levelLeft / 60);
+      if (s <= 5 && s > 0 && s !== lastBeepSec) { lastBeepSec = s; sfx.tick(); }
+      if (levelLeft <= 0) die(null, 'time');
+    }
+    if (state === 'play' && ++stepT >= lvl.speed) { stepT = 0; stepSnakes(); }
+  } else if (state === 'dead') {
+    if (--deadT <= 0) loadLevel(levelIndex);
+  } else if (state === 'clear') {
+    if (--clearT <= 0) {
+      if (levelIndex + 1 < LEVELS.length) loadLevel(levelIndex + 1);
+      else { state = 'end'; updateHud(); markLevelButtons(); }
+    }
+  }
+  for (const s of snakes) { if (s.blink > 0) s.blink--; else if (Math.random() < 0.008) s.blink = 8; }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i]; q.x += q.vx; q.y += q.vy; q.vx *= 0.94; q.vy *= 0.94;
+    if (--q.life <= 0) parts.splice(i, 1);
+  }
+  if (shake > 0) shake *= 0.85; if (shake < 0.3) shake = 0;
+  if (glitch > 0) glitch--;
+}
+
+/* ---------------- HUD ---------------- */
+function updateHud(levelChanged) {
+  document.getElementById('deaths').textContent = deaths;
+  if (state === 'title') return;
+  if (state === 'end') { document.getElementById('hint').innerHTML = 'Both snakes made it. Press <em>RETURN</em> or click the screen to run it again.'; return; }
+  document.getElementById('lvl').textContent = String(levelIndex + 1).padStart(2, '0') + ' / ' + String(LEVELS.length).padStart(2, '0');
+  const leftItems = berries.length + targets.length;
+  document.getElementById('berries').textContent = totalItems ? (leftItems ? leftItems + ' LEFT' : 'DOORS OPEN') : 'NONE';
+  if (levelChanged) document.getElementById('hint').innerHTML = lvl.hint;
+  document.getElementById('swapMeta').hidden = !lvl.mods.swap;
+  const leftBody = swapped ? 1 : 0, rightBody = 1 - leftBody;
+  const name = b => b ? 'RED' : 'BLUE', col = b => b ? C.red : C.blue;
+  document.getElementById('nameL').textContent = name(leftBody);
+  document.getElementById('nameR').textContent = name(rightBody);
+  document.getElementById('swL').style.background = col(leftBody);
+  document.getElementById('swR').style.background = col(rightBody);
+  const tagsFor = b => {
+    const t = [];
+    if (snakes[b] && snakes[b].frozen) t.push('HOME');
+    if (b === 1 && lvl.mods.mirrorB) t.push('MIRRORED');
+    if (b === 1 && lvl.mods.flipB) t.push('UPSIDE-DOWN');
+    if (lvl.mods.swap) t.push('SWAPS');
+    return t.map(s => `<span class="tag">${s}</span>`).join('');
+  };
+  document.getElementById('tagsL').innerHTML = tagsFor(leftBody);
+  document.getElementById('tagsR').innerHTML = tagsFor(rightBody);
+}
+
+/* ---------------- render ---------------- */
+function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); ctx.fill(); }
+function drawBoard() {
+  ctx.fillStyle = C.crust; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = tiles[y][x], px = x * CELL, py = y * CELL;
+    if (t !== '#' && t !== 'X') { ctx.fillStyle = (x + y) % 2 ? C.base : C.checker; ctx.fillRect(px, py, CELL, CELL); }
+    if (t === 'L' || t === 'M') {
+      const col = t === 'L' ? C.blue : C.red;
+      ctx.fillStyle = col; ctx.globalAlpha = 0.18; ctx.fillRect(px, py, CELL, CELL); ctx.globalAlpha = 0.85;
+      const off = (tick >> 2) % 6;
+      for (let k = 0; k < CELL; k += 6) ctx.fillRect(px + ((k + off) % CELL), py + 2, 2, CELL - 4);
+      ctx.globalAlpha = 1;
+    }
+  }
+  // crate marks
+  for (const t of targets) {
+    const px = t.x * CELL, py = t.y * CELL, a = 0.5 + 0.4 * Math.sin(tick * 0.1);
+    ctx.fillStyle = C.white; ctx.globalAlpha = a;
+    for (const [ox, oy, w, h] of [[3, 3, 8, 2], [3, 3, 2, 8], [CELL - 11, 3, 8, 2], [CELL - 5, 3, 2, 8], [3, CELL - 5, 8, 2], [3, CELL - 11, 2, 8], [CELL - 11, CELL - 5, 8, 2], [CELL - 5, CELL - 11, 2, 8]])
+      ctx.fillRect(px + ox, py + oy, w, h);
+    ctx.fillRect(px + CELL / 2 - 2, py + CELL / 2 - 2, 4, 4);
+    ctx.globalAlpha = 1;
+  }
+  // mines
+  for (const m of mines) {
+    const px = (m.x - 1) * CELL, py = (m.y - 1) * CELL, sz = CELL * 3;
+    const flash = m.armed && (tick >> 2) % 2;
+    ctx.fillStyle = flash ? C.white : C.mauveDeep; ctx.globalAlpha = m.armed ? 0.3 : 0.12; ctx.fillRect(px, py, sz, sz); ctx.globalAlpha = 1;
+    ctx.strokeStyle = m.armed ? C.white : C.mauve; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.lineDashOffset = -tick * 0.3;
+    ctx.strokeRect(px + 1, py + 1, sz - 2, sz - 2); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    const mx = cx(m.x), my = cy(m.y);
+    ctx.fillStyle = C.crust; ctx.beginPath(); ctx.arc(mx, my, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = m.armed ? C.white : C.mauve;
+    for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4; ctx.fillRect(mx + Math.cos(an) * 10 - 2, my + Math.sin(an) * 10 - 2, 4, 4); }
+    ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.fill();
+    if (m.armed) { ctx.fillStyle = C.crust; ctx.font = '8px "Press Start 2P", monospace'; ctx.textAlign = 'center'; ctx.fillText(m.count, mx + 0.5, my + 4); }
+  }
+  // arena outline wherever floor meets the outside
+  ctx.fillStyle = C.text;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (tiles[y][x] === '#') continue;
+    const px = x * CELL, py = y * CELL, out = (a, b) => a < 0 || b < 0 || a >= W || b >= H || tiles[b][a] === '#';
+    if (out(x, y - 1)) ctx.fillRect(px - 3, py - 3, CELL + 6, 3);
+    if (out(x, y + 1)) ctx.fillRect(px - 3, py + CELL, CELL + 6, 3);
+    if (out(x - 1, y)) ctx.fillRect(px - 3, py - 3, 3, CELL + 6);
+    if (out(x + 1, y)) ctx.fillRect(px + CELL, py - 3, 3, CELL + 6);
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (tiles[y][x] !== 'X') continue;
+    const px = x * CELL, py = y * CELL;
+    ctx.fillStyle = C.text; ctx.fillRect(px, py, CELL, CELL);
+    const solid = (a, b) => a >= 0 && b >= 0 && a < W && b < H && tiles[b][a] === 'X';
+    if (!solid(x, y - 1)) { ctx.fillStyle = C.white; ctx.fillRect(px, py, CELL, 4); }
+    if (!solid(x, y + 1)) { ctx.fillStyle = C.sub; ctx.fillRect(px, py + CELL - 5, CELL, 5); }
+  }
+}
+function drawPortals() {
+  for (const k in portals) {
+    const [x, y] = k.split(',').map(Number), p = portals[k];
+    const px = cx(x), py = cy(y);
+    ctx.save(); ctx.translate(px, py);
+    for (let r = 0; r < 3; r++) {
+      ctx.save(); ctx.rotate(tick * 0.03 * (r % 2 ? -1 : 1) + r);
+      ctx.strokeStyle = r === 1 ? C.mauve : C.lav; ctx.lineWidth = 2;
+      const s = 22 - r * 6; ctx.strokeRect(-s / 2, -s / 2, s, s);
+      ctx.restore();
+    }
+    ctx.fillStyle = C.white; ctx.font = '8px "Press Start 2P", monospace'; ctx.textAlign = 'center';
+    ctx.fillText(p.n, 0.5, 4);
+    ctx.restore();
+  }
+}
+function lerpPos(o, t) {
+  const fx = o.px ?? o.x, fy = o.py ?? o.y;
+  return [cx(fx + (o.x - fx) * t), cy(fy + (o.y - fy) * t)];
+}
+function drawBoxes(t) {
+  for (const b of boxes) {
+    const [mx, my] = lerpPos(b, t), px = mx - CELL / 2, py = my - CELL / 2;
+    const col = b.k === 'u' ? C.blue : b.k === 'w' ? C.red : C.text, dk = b.k === 'u' ? C.blueDeep : b.k === 'w' ? C.redDeep : C.sub;
+    ctx.fillStyle = C.crust; ctx.fillRect(px + 3, py + 4, CELL - 4, CELL - 4);
+    ctx.fillStyle = col; ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+    ctx.strokeStyle = dk; ctx.lineWidth = 3;
+    ctx.strokeRect(px + 5.5, py + 5.5, CELL - 11, CELL - 11);
+    ctx.beginPath(); ctx.moveTo(px + 7, py + 7); ctx.lineTo(px + CELL - 7, py + CELL - 7); ctx.moveTo(px + CELL - 7, py + 7); ctx.lineTo(px + 7, py + CELL - 7); ctx.stroke();
+  }
+}
+function drawBerries(t) {
+  for (const b of berries) {
+    const bob = Math.sin(tick * 0.08 + b.ph) * 2;
+    const [lx, ly] = b.dx !== undefined ? lerpPos(b, t) : [cx(b.x), cy(b.y)];
+    const px = lx, py = ly + bob;
+    if (b.dx !== undefined) { ctx.strokeStyle = C.overlay; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - b.dx * 10, py - b.dy * 10); ctx.stroke(); }
+    const col = b.k === 'l' ? C.blue : b.k === 'm' ? C.red : C.white;
+    ctx.fillStyle = C.crust; ctx.beginPath(); ctx.arc(px + 1, py + 2, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.white; ctx.globalAlpha = 0.7; ctx.fillRect(px - 4, py - 4, 3, 3); ctx.globalAlpha = 1;
+    ctx.fillStyle = b.k === '*' ? C.mauveDeep : C.white; ctx.fillRect(px - 1, py - 12, 3, 5); ctx.fillRect(px + 2, py - 12, 4, 2);
+  }
+}
+function drawGoals() {
+  const open = goalsOpen();
+  for (const g of goals) {
+    const id = goals.indexOf(g), s = snakes[id], col = id ? C.red : C.blue;
+    if (s.frozen) continue;
+    const px = g.x * CELL, py = g.y * CELL;
+    if (open) {
+      const a = 0.45 + 0.35 * Math.sin(tick * 0.1 + id * 2);
+      ctx.globalAlpha = a; ctx.fillStyle = col; ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.strokeRect(px + 2.5, py + 2.5, CELL - 5, CELL - 5);
+      ctx.fillStyle = C.crust; ctx.font = '8px "Press Start 2P", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(id ? 'B' : 'A', px + CELL / 2 + 0.5, py + CELL / 2 + 4);
+    } else {
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.strokeRect(px + 3, py + 3, CELL - 6, CELL - 6); ctx.setLineDash([]);
+      ctx.fillStyle = col; ctx.fillRect(px + 11, py + 14, 8, 7);
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + 15, py + 14, 3, Math.PI, 0); ctx.stroke();
+    }
+  }
+}
+function snakePoints(s, t) {
+  const pts = [];
+  for (let i = 0; i < s.body.length; i++) {
+    const to = s.body[i];
+    let from = s.prev[i] || s.prev[s.prev.length - 1] || to;
+    if (Math.abs(from[0] - to[0]) + Math.abs(from[1] - to[1]) > 1) from = to;
+    pts.push({ x: cx(from[0] + (to[0] - from[0]) * t), y: cy(from[1] + (to[1] - from[1]) * t) });
+  }
+  return pts;
+}
+function drawSnake(s, t) {
+  const dying = state === 'dead' && (deadSnake === s || !deadSnake);
+  if (dying && (tick >> 2) % 2) return;
+  const pts = snakePoints(s, s.frozen ? 1 : t);
+  const col = dying ? C.white : s.frozen ? s.deep : s.color;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) {
+    ctx.strokeStyle = pass ? col : C.crust; ctx.lineWidth = pass ? CELL - 10 : CELL - 4;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (i === 0 || Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) > CELL * 1.2) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    if (pts.length === 1 || pts.every(p => p.x === pts[0].x && p.y === pts[0].y)) ctx.lineTo(pts[0].x + 0.01, pts[0].y);
+    ctx.stroke();
+  }
+  // belly stripe
+  ctx.strokeStyle = s.frozen ? C.crust : s.deep; ctx.lineWidth = 3; ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i];
+    if (i === 1 || Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) > CELL * 1.2) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke(); ctx.globalAlpha = 1;
+  // head
+  const h = pts[0], d = s.dir ? DIRS[s.dir] : [1, 0];
+  ctx.fillStyle = C.crust; rr(h.x - 13, h.y - 13, 26, 26, 8);
+  ctx.fillStyle = col; rr(h.x - 11, h.y - 11, 22, 22, 7);
+  ctx.fillStyle = C.white; ctx.globalAlpha = 0.5; ctx.fillRect(h.x - 8, h.y - 8, 5, 3); ctx.globalAlpha = 1;
+  ctx.fillStyle = C.crust;
+  const ox = d[0] * 4, oy = d[1] * 4, px = -d[1] * 5, py = d[0] * 5;
+  if (s.frozen || s.blink > 0) {
+    ctx.fillRect(h.x + ox + px - 2, h.y + oy + py - 1, 4, 2); ctx.fillRect(h.x + ox - px - 2, h.y + oy - py - 1, 4, 2);
+  } else {
+    ctx.fillRect(h.x + ox + px - 2, h.y + oy + py - 2, 4, 4); ctx.fillRect(h.x + ox - px - 2, h.y + oy - py - 2, 4, 4);
+  }
+  if (s.frozen) return;
+  // which hand steers it
+  const hand = (swapped ? 1 - s.id : s.id) ? 'R' : 'L';
+  const ty = h.y - 30;
+  ctx.fillStyle = C.crust; ctx.globalAlpha = 0.8; ctx.fillRect(h.x - 7, ty, 14, 12); ctx.globalAlpha = 1;
+  ctx.fillStyle = s.color; ctx.font = '8px "Press Start 2P", monospace'; ctx.textAlign = 'center';
+  ctx.fillText(hand, h.x + 0.5, ty + 10);
+  if (state === 'play' && readyT > 0) {
+    // facing arrow so you can line up before GO
+    const ax = h.x + d[0] * 26, ay = h.y + d[1] * 26;
+    ctx.fillStyle = (tick >> 3) % 2 ? C.white : s.color;
+    ctx.beginPath();
+    ctx.moveTo(ax + d[0] * 8, ay + d[1] * 8);
+    ctx.lineTo(ax - d[1] * 7 - d[0] * 4, ay + d[0] * 7 - d[1] * 4);
+    ctx.lineTo(ax + d[1] * 7 - d[0] * 4, ay - d[0] * 7 - d[1] * 4);
+    ctx.fill();
+  }
+}
+function drawParts() {
+  for (const q of parts) { ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.fillStyle = q.c; ctx.fillRect(Math.round(q.x), Math.round(q.y), q.s, q.s); }
+  ctx.globalAlpha = 1;
+}
+function centerText(txt, y, size, color, shadow) {
+  ctx.font = size + 'px "Press Start 2P", monospace'; ctx.textAlign = 'center';
+  if (shadow) { ctx.fillStyle = shadow; ctx.fillText(txt, cv.width / 2 + size / 8 + 2, y + size / 8 + 2); }
+  ctx.fillStyle = color; ctx.fillText(txt, cv.width / 2, y);
+}
+function drawSwapBar() {
+  if (!lvl.mods.swap || state !== 'play') return;
+  const ph = (swapT % 300) / 300, bw = cv.width - 200;
+  ctx.fillStyle = C.crust; ctx.fillRect(40, 10, bw, 12);
+  ctx.fillStyle = ph > 0.8 && (tick >> 3) % 2 ? C.white : C.mauve;
+  ctx.fillRect(42, 12, (bw - 4) * ph, 8);
+}
+function drawCountdown() {
+  if (!limitSec || (state !== 'play' && state !== 'dead')) return;
+  const left = Math.max(0, levelLeft) / 60, low = left <= 5;
+  const bw = 96, bx = cv.width - bw - 8, by = 6;
+  ctx.fillStyle = C.crust; ctx.fillRect(bx, by, bw, 24);
+  ctx.fillStyle = low && (tick >> 3) % 2 ? C.white : C.mauve;
+  ctx.fillRect(bx + 2, by + 20, (bw - 4) * Math.min(1, left / limitSec), 2);
+  ctx.font = (low ? 14 : 12) + 'px "Press Start 2P", monospace'; ctx.textAlign = 'center';
+  ctx.fillText(left.toFixed(1), bx + bw / 2, by + 17);
+}
+function drawTitle() {
+  ctx.fillStyle = C.crust; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { ctx.fillStyle = (x + y) % 2 ? C.base : C.checker; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+  const fake = (id, dirSign, yBase, phase) => {
+    const s = { id, body: [], prev: [], dir: dirSign > 0 ? 'right' : 'left', frozen: false, started: true, blink: (tick + phase) % 180 < 8 ? 1 : 0,
+      color: id ? C.red : C.blue, deep: id ? C.redDeep : C.blueDeep, queue: [] };
+    const head = ((tick * 0.08 * dirSign) % (W + 12) + (W + 12)) % (W + 12) - 6;
+    for (let i = 0; i < 9; i++) {
+      const xx = head - i * dirSign;
+      s.body.push([xx, yBase + Math.round(Math.sin((xx + phase) * 0.5) * 1.2)]);
+    }
+    s.prev = s.body.map(c => c.slice());
+    const sv = swapped, st = state; swapped = false; state = 'title'; drawSnake(s, 1); swapped = sv; state = st;
+  };
+  fake(0, 1, 12, 0); fake(1, -1, 14, 3);
+  centerText('CALLOSUM', 150, 48, C.white, C.mauveDeep);
+  centerText('TWO SNAKES  ·  ONE BRAIN', 200, 12, C.mauve);
+  if ((tick >> 5) % 2 === 0) centerText('PRESS RETURN OR CLICK', 290, 16, C.text);
+}
+function drawEnd() {
+  ctx.fillStyle = C.crust; ctx.fillRect(0, 0, cv.width, cv.height);
+  centerText('BOTH SNAKES', 190, 32, C.white, C.mauveDeep);
+  centerText('MADE IT HOME', 240, 32, C.white, C.mauveDeep);
+  centerText(deaths + (deaths === 1 ? ' DEATH' : ' DEATHS') + '   ·   ' + fmt(runFrames), 300, 14, C.mauve);
+  if (skipped) centerText('LEVELS SKIPPED, SO THIS RUN DOESN’T COUNT FOR BEST', 335, 10, C.overlay);
+  else if (newBest) centerText('NEW BEST RUN. HELL YEAH, WILLEM.', 335, 12, C.white);
+  else if (bests.run != null) centerText('BEST ' + fmt(bests.run), 335, 10, C.overlay);
+  if ((tick >> 5) % 2 === 0) centerText('PRESS RETURN OR CLICK', 420, 14, C.text);
+}
+function render() {
+  if (state === 'title') { drawTitle(); return; }
+  if (state === 'end') { drawEnd(); drawParts(); return; }
+  const t = state === 'play' && readyT === 0 ? Math.min(1, stepT / lvl.speed) : 1;
+  ctx.save();
+  if (shake) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  drawBoard(); drawPortals(); drawGoals(); drawBoxes(t); drawBerries(t);
+  for (const s of snakes) drawSnake(s, t);
+  drawParts();
+  ctx.restore();
+  drawSwapBar(); drawCountdown();
+  if (state === 'play' && readyT > 0) {
+    ctx.fillStyle = C.crust; ctx.globalAlpha = 0.8; ctx.fillRect(0, cv.height / 2 - 70, cv.width, 130); ctx.globalAlpha = 1;
+    centerText(String(levelIndex + 1).padStart(2, '0') + '  ' + lvl.name.toUpperCase(), cv.height / 2 - 30, 22, C.white, C.mauveDeep);
+    const words = lvl.hint.replace(/<[^>]+>/g, '').toUpperCase().split(' ');
+    const lines = ['']; for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).length > 70) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); }
+    lines.slice(0, 2).forEach((ln, k) => centerText(ln, cv.height / 2 + 2 + k * 16, 9, C.mauve));
+    centerText(String(Math.ceil(readyT / 50)), cv.height / 2 + 50, 16, C.white);
+  } else if (state === 'play' && readyT === 0 && levelFrames < 30) {
+    centerText('GO', cv.height / 2 + 10, 40, C.white, C.mauveDeep);
+  }
+  if (state === 'clear') {
+    centerText('SYNCED', cv.height / 2, 28, C.white, C.mauveDeep);
+    const b = bests.levels[levelIndex];
+    centerText(fmt(lastLevelTime) + (b === lastLevelTime ? '  NEW BEST' : '  BEST ' + fmt(b)), cv.height / 2 + 34, 12, C.mauve);
+  }
+  if (state === 'dead') {
+    ctx.fillStyle = C.crust; ctx.globalAlpha = 0.7; ctx.fillRect(0, cv.height / 2 - 76, cv.width, 102); ctx.globalAlpha = 1;
+    if (deathReason === 'time') centerText("TIME'S UP", cv.height / 2 - 42, 14, C.mauve);
+    centerText(deathLine, cv.height / 2 + Math.sin(tick * 0.5) * 2, 26, C.white, C.mauveDeep);
+  }
+  if (glitch > 0) {
+    for (let k = 0; k < 7; k++) {
+      const y = Math.random() * cv.height, h = 6 + Math.random() * 30, dx = (Math.random() - 0.5) * 50;
+      ctx.drawImage(cv, 0, y, cv.width, h, dx, y, cv.width, h);
+    }
+    ctx.fillStyle = C.mauve; ctx.globalAlpha = 0.08; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------------- loop + boot ---------------- */
+let last = performance.now(), acc = 0;
+function frame(now) {
+  acc += Math.min(100, now - last); last = now;
+  while (acc >= 1000 / 60) { update(); acc -= 1000 / 60; }
+  render();
+  requestAnimationFrame(frame);
+}
+function boot(data) {
+  data = data || {};
+  if (typeof data.deaths === 'number') deaths = data.deaths;
+  if (data.started && typeof data.level === 'number' && LEVELS[data.level]) loadLevel(data.level);
+  updateHud(true); updateTimes();
+  requestAnimationFrame(frame);
+}
+const hot = window.claude && window.claude.hot;
+if (hot && hot.snapshot) { try { hot.snapshot(() => ({ level: levelIndex, deaths, started: state !== 'title' && state !== 'end' })); } catch (e) {} }
+const go = () => (hot && hot.ready ? hot.ready(boot) : boot(hot && hot.data ? hot.data : {}));
+if (document.fonts && document.fonts.load) document.fonts.load('16px "Press Start 2P"').then(go, go); else go();
+})();
+</script>
+</body>
+</html>
