@@ -4,7 +4,7 @@ Two snakes, two hands. Steer one snake with **WASD** and the other with **IJKL**
 
 **Play:** https://willemhelmet.github.io/double-snake/
 
-- Enter or click to start, R to restart, and the level buttons jump between levels.
+- Enter or click to start, R to restart the level, N and P (or the level buttons) to skip between levels.
 - An Xbox controller works too: the left stick steers one snake and the right stick (or the face buttons) steers the other. Two controllers give one snake each.
 - Best times are saved in your browser.
 
